@@ -8,7 +8,7 @@ import os
 
 def parse_args():
 	parser = argparse.ArgumentParser(description='Train a network')
-	parser.add_argument('--f', dest='feature', default=True, type=bool)
+	parser.add_argument('--f', dest='feature', default=False, type=bool)
 	parser.add_argument('--cut', dest='num_cuts', default=5, type=int)
 	parser.add_argument('--model', dest='model_name', type=str)
 	parser.add_argument('--path', dest='path', type=str, default='./result/')
@@ -31,7 +31,6 @@ def train(feature, model_name, num_cuts, path):
 	else:
 		img_size = [240, 320, 3]
 
-
 	checkpointer = ModelCheckpoint(filepath=path+model_name+\
 		'.{epoch:03d}-{val_loss:.3f}.hdf5', verbose=1, save_best_only=True)
 
@@ -45,14 +44,14 @@ def train(feature, model_name, num_cuts, path):
 	validation_steps = vdata.get_num()//batch_size
 
 	generator = tdata.generate(batch_size=batch_size, num_cuts=num_cuts)
-	val_generator = vdata.generate(batch_size=batch_size, num_cuts=num_cuts) 
+	val_generator = vdata.generate(batch_size=batch_size, num_cuts=num_cuts)
 
 	mdl = mymodels(nb_classes, model_name, num_cuts, img_size, saved_model)
-	mdl.model.fit_generator(generator=generator, steps_per_epoch=steps_per_epoch, 
+	mdl.model.fit_generator(generator=generator, steps_per_epoch=steps_per_epoch,
 		epochs=nb_epoch, callbacks=[checkpointer, csv_logger],
-		validation_data=val_generator, validation_steps=validation_steps)
+		validation_data=val_generator, validation_steps=validation_steps, verbose=2)
 
-	mdl.model.save(path+'final.hdf5')
+	#mdl.model.save(path+'final.hdf5')
 
 if __name__=='__main__':
 	args = parse_args()
@@ -60,3 +59,4 @@ if __name__=='__main__':
 	print(args)
 
 	train(args.feature, args.model_name, args.num_cuts, args.path)
+	#python train.py --model mcnn --cut 10 --path './result/a/'

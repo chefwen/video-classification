@@ -88,6 +88,31 @@ class DataSet():
             yield tmp_inp, tmp_targets
 
 
+    def generateall(self):
+        while True:
+            X, y = [], []
+            n=0
+            for video in self.videos: 
+                n=n+1
+                if n==len(self.videos):
+                    print('Reach the end')
+                frames = os.listdir(self.path + video)
+                frames = sorted(frames)
+                clip = []
+                for i in frames:
+                    frame = self.f(self.path+ video + '/' 
+                        + i)
+                    clip.append(frame.flatten())
+                #clip = np.amax(clip, axis=0)#comment if not all mcnn case
+                X.append(clip)
+                y.append(self.class_index[video[2:-8]])
+
+                tmp_inp = np.array(X)
+                tmp_targets = to_categorical(y, 5)
+                X, y = [], []
+                yield tmp_inp, tmp_targets
+
+
     def generate_a(self, batch_size, num_cuts):
         X, y = [], []
         while True:
@@ -107,6 +132,8 @@ class DataSet():
                 X.append(clip)
                 y.append(self.class_index[video[2:-8]])       
                 if len(y)==batch_size or n == len(self.videos):
+                    if n == len(self.videos):
+                        print("Reach the end")
                     tmp_inp = np.array(X)
                     tmp_targets = to_categorical(y,5)
                     X, y = [], []
@@ -140,8 +167,8 @@ class DataSet():
 
 if __name__ =='__main__':
     # check if the image has the right label
-    data=DataSet('train', False)
-    b= data.generate(2, 3)
+    data=DataSet('val', False) 
+    b= data.generate_a(50, 3)
     a,c =next(b)
     s = [10, 18, 48, 86, 94]
     num = 0

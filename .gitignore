@@ -2,6 +2,4 @@ features/
 *.pyc
 images/
 result/
-UCF-101/
-archive/
-fall/
+ucfTrainTestlist

@@ -1,7 +1,7 @@
 import sys
 
 from keras.models import Model
-from keras.layers import Dense, Flatten, Dropout, Input
+from keras.layers import Dense, Flatten, Dropout, Input, Activation
 from keras.layers.recurrent import LSTM
 from keras.models import Sequential, load_model
 from keras.layers.wrappers import TimeDistributed
@@ -27,14 +27,10 @@ class mymodels():
 			print("Loading RNN model.")
 			self.input_shape = [num_cuts]+img_size
 			self.model = self.crnn()
-		elif modelname == '3dcnn':
-			print("Loading Conv3D")
-			self.input_shape = [num_cuts]+img_size
-			self.model = self.conv_3d()
-		elif modelname == '2dcnn':
+		elif modelname == 'cnn':
 			print("Loading Conv2D")
 			self.input_shape = img_size
-			self.model = self.conv_2d()
+			self.model = self.conv2()
 		elif modelname == 'pre':
 			print("Loading pretrained model.")
 			self.input_shape = img_size
@@ -50,51 +46,33 @@ class mymodels():
 		#optimizer = optimizers.Adam(lr=1e-4)
 		optimizer = optimizers.SGD(lr=0.0001, decay=1e-6, momentum=0.9, nesterov=True)
 		self.model.compile(loss='categorical_crossentropy', optimizer=optimizer,
-			metrics=metrics,verbose=2)
+			metrics=metrics)
 
-	def crnn_o(self):
+	def crnn(self):
 		model = Sequential()
-		model.add(TimeDistributed(Conv2D(16,(3,3), padding='same', activation='relu'), 
+		model.add(TimeDistributed(Conv2D(16,(3,3), padding='same', activation='relu'),
 			input_shape=self.input_shape))
 		model.add(TimeDistributed(MaxPooling2D()))
 		model.add(TimeDistributed(Conv2D(16,(3,3), padding='same', activation='relu')))
 		model.add(TimeDistributed(MaxPooling2D()))
 		model.add(TimeDistributed(Conv2D(16,(3,3), padding='same', activation='relu')))
 		model.add(TimeDistributed(MaxPooling2D()))
+		model.add(TimeDistributed(Conv2D(16,(3,3), padding='same', activation='relu')))
+		model.add(TimeDistributed(MaxPooling2D()))
+		model.add(TimeDistributed(Conv2D(16,(3,3), padding='same', activation='relu')))
+		model.add(TimeDistributed(MaxPooling2D()))
 		model.add(TimeDistributed(Flatten()))
-		model.add(LSTM(32, return_sequences=True))
-		model.add(LSTM(32, return_sequences=True))
-		model.add(LSTM(32, return_sequences=True))
-		model.add(Flatten())
-		model.add(Dropout(0.5))
-		model.add(Dense(256, activation='relu'))
+		model.add(LSTM(256))
+		# model.add(LSTM(32, return_sequences=True))
+		# model.add(LSTM(32, return_sequences=True))
 		model.add(Dropout(0.5))
 		model.add(Dense(self.nb_classes, activation='softmax'))
 		print(model.summary())
 
 		return model
 
-	def conv_3d(self):
-		model = Sequential()
-		model.add(Conv3D(16,(3,3,3), padding='same', input_shape=
-			self.input_shape, activation='relu'))
-		model.add(MaxPooling3D(pool_size=(1,2,2), strides=(1,2,2)))
-		model.add(Conv3D(32, (3,3,3), padding='same', activation='relu'))
-		model.add(MaxPooling3D(pool_size=(2,2,2), strides=(2,2,2)))
-		model.add(Conv3D(64, (3,3,3), padding='same', activation='relu'))
-		model.add(MaxPooling3D(pool_size=(2,2,2), strides=(2,2,2)))
-		model.add(Conv3D(64, (3,3,3), padding='same', activation='relu'))
-		model.add(MaxPooling3D(pool_size=(2,2,2), strides=(2,2,2)))
-		model.add(Flatten())
-		model.add(Dropout(0.5))
-		model.add(Dense(256))
-		model.add(Dropout(0.5))
-		model.add(Dense(self.nb_classes, activation='softmax'))
-		print(model.summary())
 
-		return model
-
-	def oconv_2d(self):
+	def conv2(self):
 		model = Sequential()
 		model.add(Conv2D(16, (3, 3), padding='same', input_shape=self.input_shape,
 			activation='relu'))
@@ -103,98 +81,58 @@ class mymodels():
 		model.add(MaxPooling2D((2,2)))
 		model.add(Conv2D(16, (3, 3), padding='same', activation='relu'))
 		model.add(MaxPooling2D((2,2)))
+		model.add(Conv2D(16, (3, 3), padding='same', activation='relu'))
+		model.add(MaxPooling2D((2,2)))
 		model.add(Flatten())
 		model.add(Dropout(0.5))
 		model.add(Dense(256, activation='relu'))
 		model.add(Dropout(0.5))
 		model.add(Dense(self.nb_classes, activation='softmax'))
-		#print(model.summary())
-
-		return model
-
-	def conv_2d(self):
-		input_layer = Input(shape=self.input_shape)
-		x = Flatten()(input_layer)
-		x = Dropout(0.5)(x)
-		x = Dense(512, activation='relu')(x)
-		x = Dropout(0.5)(x)
-		x = Dense(self.nb_classes, activation='softmax')(x)
-		model = Model(inputs=input_layer, outputs=x)
 		print(model.summary())
 
 		return model
 
-	def pretrained(self):
+	def conv2_pre(self):
 		input_tensor = Input(shape=self.input_shape)
-		base_model = VGG16(input_tensor=input_tensor, weights='imagenet', 
+		base_model = VGG16(input_tensor=input_tensor, weights='imagenet',
 			include_top=False)
 		x = base_model.output
 		x = Flatten()(x)
 		x = Dropout(0.5)(x)
-		x = Dense(512, activation='relu')(x)
+		x = Dense(256, activation='relu')(x)
 		x = Dropout(0.5)(x)
 		x = Dense(self.nb_classes, activation='softmax')(x)
 		model = Model(inputs=base_model.input, outputs=x)
+		for layer in base_model.layers:
+			layer.trainable = True
+		print(model.summary())
+
+		return model
+
+	def crnn_pre(self):
+		base_model = VGG16(weights='imagenet', include_top=False)
+		input_layer = Input(shape=self.input_shape)
+		x = TimeDistributed(base_model)(input_layer)
+		x = TimeDistributed(Flatten())(x)
+		x = LSTM(256)(x)
+		# x = Flatten()(x)
+		# x = Dropout(0.5)(x)
+		# x = Dense(256, activation='relu')(x)
+		x = Dropout(0.5)(x)
+		x = Dense(self.nb_classes, activation='softmax')(x)
+		model = Model(inputs=input_layer, outputs=x)
 		for layer in base_model.layers:
 			layer.trainable = False
 		print(model.summary())
 
 		return model
 
-	def ocrnn(self):
-		base_model = VGG16(weights='imagenet', include_top=False)
-		#print self.input_shape
-		input_layer = Input(shape=self.input_shape)
-		x = TimeDistributed(base_model)(input_layer)
-		x = TimeDistributed(Flatten())(x)
-		x = LSTM(32, return_sequences=True)(x)
-		x = Flatten()(x)
-		x = Dropout(0.5)(x)
-		x = Dense(256, activation='relu')(x)
-		x = Dropout(0.5)(x)
-		x = Dense(self.nb_classes, activation='softmax')(x)
-		model = Model(inputs=input_layer, outputs=x)
-		for layer in base_model.layers[:-1]:
-			layer.trainable = False
-		print(model.summary())
-
-		return model
-
-	def crnn(self):
+	def mcnn_feature(self):
 		input_layer = Input(shape=self.input_shape)
 		x = TimeDistributed(Flatten())(input_layer)
-		x = LSTM(32, return_sequences=True)(x)
-		x = Flatten()(x)
 		x = Dropout(0.5)(x)
-		x = Dense(256, activation='relu')(x)
-		x = Dropout(0.5)(x)
-		x = Dense(self.nb_classes, activation='softmax')(x)
-		model = Model(inputs=input_layer, outputs=x)
-		print(model.summary())
-
-		return model
-
-	def mcnn(self):
-		input_layer = Input(shape=self.input_shape)
-		x = TimeDistributed(Flatten())(input_layer)
-		x = TimeDistributed(Dropout(0.5))(x)
 		x = TimeDistributed(Dense(512, activation='relu'))(x)
-		x = AveragePooling1D(pool_size=self.input_shape[0])(x)
-		x = Flatten()(x)
 		x = Dropout(0.5)(x)
-		x = Dense(self.nb_classes, activation='softmax')(x)
-		model = Model(inputs=input_layer, outputs=x)
-		print(model.summary())
-
-		return model
-
-	def mcnn1(self):
-		input_layer = Input(shape=self.input_shape)
-		x = TimeDistributed(Flatten())(input_layer)
-		x = TimeDistributed(Dropout(0.5))(x)
-		x = TimeDistributed(Dense(512, activation='relu'))(x)
-		x = TimeDistributed(Flatten())(x)
-		x = TimeDistributed(Dropout(0.5))(x)
 		x = TimeDistributed(Dense(self.nb_classes, activation='softmax'))(x)
 		x = MaxPooling1D(pool_size=self.input_shape[0])(x)
 		x = Flatten()(x)
@@ -203,11 +141,61 @@ class mymodels():
 
 		return model
 
-if __name__=='__main__':
-	a=mymodels(5, 'mcnn', 10, [7,10,512])
+	def mcnn3_pre(self):
+		base_model = VGG16(weights='imagenet', include_top=False)
+		input_layer = Input(shape=self.input_shape)
+		x = TimeDistributed(base_model)(input_layer)
+		x = TimeDistributed(Flatten())(x)
+		x = TimeDistributed(Dropout(0.5))(x)
+		x = TimeDistributed(Dense(512, activation='relu'))(x)
+		x = TimeDistributed(Dropout(0.5))(x)
+		x = TimeDistributed(Dense(self.nb_classes))(x)
+		x = MaxPooling1D(pool_size=self.input_shape[0])(x)
+		x = Flatten()(x)
+		x = Activation('softmax')(x)
+		model = Model(inputs=input_layer, outputs=x)
+		for layer in base_model.layers:
+			layer.trainable = False
+		print(model.summary())
+
+		return model
+
+	def mcnn(self):
+		base_model = VGG16(weights='imagenet', include_top=False)
+		input_layer = Input(shape=self.input_shape)
+		x = TimeDistributed(base_model)(input_layer)
+		x = TimeDistributed(Flatten())(x)
+		x = TimeDistributed(Dropout(0.5))(x)
+		x = TimeDistributed(Dense(512, activation='relu'))(x)
+		x = MaxPooling1D(pool_size=self.input_shape[0])(x)
+		x = Flatten()(x)
+		x = Dropout(0.5)(x)
+		x = Dense(self.nb_classes, activation='softmax')(x)
+		model = Model(inputs=input_layer, outputs=x)
+		for layer in base_model.layers:
+			layer.trainable = False
+		print(model.summary())
+
+		return model
+
+	def mcnn1_pre(self):
+		base_model = VGG16(weights='imagenet', include_top=False)
+		input_layer = Input(shape=self.input_shape)
+		x = TimeDistributed(base_model)(input_layer)
+		x = TimeDistributed(Flatten())(x)
+		x = MaxPooling1D(pool_size=self.input_shape[0])(x)
+		x = Dropout(0.5)(x)
+		x = Dense(512, activation='relu')(x)
+		x = Flatten()(x)
+		x = Dropout(0.5)(x)
+		x = Dense(self.nb_classes, activation='softmax')(x)
+		model = Model(inputs=input_layer, outputs=x)
+		for layer in base_model.layers:
+			layer.trainable = False
+		print(model.summary())
+
+		return model
 
 
-
-
-
-
+# if __name__=='__main__':
+# 	a=mymodels(5, 'mcnn', 10, [7,10,512])
